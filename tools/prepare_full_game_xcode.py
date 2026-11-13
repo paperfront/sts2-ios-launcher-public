@@ -30,7 +30,7 @@ APP_ICON = "AppIcon-1024.png"
 # build carrying QuickMatch gets this text in place of the engine template's, and a build without it gets none.
 UNUSED_PURPOSE_KEYS = ("NSCameraUsageDescription", "NSPhotoLibraryUsageDescription", "NSMicrophoneUsageDescription")
 LOCAL_NETWORK_KEY = "NSLocalNetworkUsageDescription"
-LOCAL_NETWORK_PURPOSE = "Join a friend’s Slay the Spire 2 game by its Wi-Fi or Tailscale IP address. Connections start only when you tap Join LAN."
+LOCAL_NETWORK_PURPOSE = "Host or join Slay the Spire 2 with friends using Wi-Fi or Tailscale. Hosting starts when you choose Host or Load; joining starts when you tap Join LAN."
 MICROPHONE_KEY = "NSMicrophoneUsageDescription"
 MICROPHONE_PURPOSE = (
     "Voice chat with your Quick Match teammates. The microphone is used only while you turn your mic "

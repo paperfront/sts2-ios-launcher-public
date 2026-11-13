@@ -37,7 +37,7 @@ internal sealed partial class LanJoinScreen : Node
         var column = new VBoxContainer();
         column.AddThemeConstantOverride("separation", 16);
         padding.AddChild(column);
-        var help = Text("On Windows/Mac, add --fastmp to Steam launch options, restart the game, then Host.\nEnter the host’s Wi-Fi or Tailscale IP. Everyone needs the same game version; leave Mods off.");
+        var help = Text("A friend can host from iPhone with Multiplayer > Host, or desktop with --fastmp.\nEnter their Wi-Fi or Tailscale IP. Everyone needs the same game version; leave Mods off.");
         column.AddChild(help);
         var address = new LineEdit { PlaceholderText = "192.168.1.20 or 100.x.x.x[:port]", CustomMinimumSize = new Vector2(0, 64),
             VirtualKeyboardType = LineEdit.VirtualKeyboardTypeEnum.Default };

@@ -7,7 +7,7 @@ namespace STS2Mobile.GamePatcher.Tests;
 public sealed class LanNetworkPatchTests
 {
     [Fact]
-    public void TheClientIsGuardedAndHostingAndRawSocketsRemainBlocked()
+    public void BothClientAndHostAreGuardedAndRawSocketsRemainBlocked()
     {
         using var fixture = new Fixture();
         NetworkPatches.Steps.Single().Apply(fixture.Patch);
@@ -16,7 +16,12 @@ public sealed class LanNetworkPatchTests
         int guard = instructions.ToList().FindIndex(i => i.Operand is MethodReference m && m.Name == "RequirePeer");
         int connect = instructions.ToList().FindIndex(i => i.Operand is MethodReference m && m.Name == "ConnectToHost");
         Assert.True(guard >= 0 && guard < connect);
-        Assert.Contains(fixture.Host.Body.Instructions, i => i.OpCode == OpCodes.Throw);
+        Assert.DoesNotContain(fixture.Host.Body.Instructions, i => i.OpCode == OpCodes.Throw);
+        var hostInstructions = fixture.Host.Body.Instructions;
+        int hostGuard = hostInstructions.ToList().FindIndex(i => i.Operand is MethodReference m && m.Name == "ResolveListenAddress");
+        int bind = hostInstructions.ToList().FindIndex(i => i.Operand is MethodReference m && m.Name == "CreateHostBound");
+        Assert.True(hostGuard >= 0 && hostGuard < bind);
+        Assert.StartsWith("stloc", hostInstructions[hostGuard + 1].OpCode.Name);
         Assert.Contains(fixture.RawSocket.Body.Instructions, i => i.OpCode == OpCodes.Throw);
         Assert.Single(fixture.Opened.Body.Instructions);
         Assert.Equal(OpCodes.Ret, fixture.Opened.Body.Instructions[0].OpCode);
@@ -49,7 +54,7 @@ public sealed class LanNetworkPatchTests
     }
 
     [InstalledGameFact]
-    public void TheRealGameHasOneGuardedClientAndNoEnabledEnetHost()
+    public void TheRealGameHasOneGuardedClientAndOneGuardedHost()
     {
         string folder = Directory.CreateTempSubdirectory("lan-real-game-").FullName;
         try
@@ -60,10 +65,36 @@ public sealed class LanNetworkPatchTests
             var guards = methods.SelectMany(m => m.Body.Instructions).Where(i => i.Operand is MethodReference r &&
                 r.DeclaringType.FullName == "STS2Mobile.Platform.LanNetworkPolicy" && r.Name == "RequirePeer");
             Assert.Single(guards);
-            Assert.Single(methods.SelectMany(m => m.Body.Instructions), i => i.OpCode == OpCodes.Newobj &&
-                i.Operand is MethodReference r && r.DeclaringType.FullName == "Godot.ENetConnection");
+            Assert.Equal(2, methods.SelectMany(m => m.Body.Instructions).Count(i => i.OpCode == OpCodes.Newobj &&
+                i.Operand is MethodReference r && r.DeclaringType.FullName == "Godot.ENetConnection"));
+            Assert.Single(methods.SelectMany(m => m.Body.Instructions), i => i.Operand is MethodReference r &&
+                r.DeclaringType.FullName == "STS2Mobile.Platform.LanNetworkPolicy" && r.Name == "ResolveListenAddress");
         }
         finally { Directory.Delete(folder, recursive: true); }
+    }
+
+    [Fact]
+    public void AnUnexpectedHostOrBindSignatureFailsClosed()
+    {
+        using var fixture = new Fixture(tolerant: true);
+        fixture.Host.DeclaringType.Name = "UnknownHost";
+        Assert.Throws<InvalidOperationException>(() => NetworkPatches.Steps.Single().Apply(fixture.Patch));
+        using var badBind = new Fixture();
+        badBind.EngineBind.Parameters[1].ParameterType = badBind.Game.MainModule.TypeSystem.String;
+        Assert.Throws<InvalidOperationException>(() => NetworkPatches.Steps.Single().Apply(badBind.Patch));
+    }
+
+    [Fact]
+    public void NativeFastmpModeIsEnabledWithoutReplacingOtherArgumentChecks()
+    {
+        using var fixture = new Fixture();
+        var original = fixture.HasArg.Body.Instructions[0];
+        NetworkPatches.Steps.Single().Apply(fixture.Patch);
+        var instructions = fixture.HasArg.Body.Instructions;
+        Assert.Contains(instructions, i => i.Operand is MethodReference m && m.Name == "IsFastMultiplayerArgument");
+        Assert.Contains(instructions, i => i.OpCode.FlowControl == FlowControl.Cond_Branch && ReferenceEquals(i.Operand, original));
+        Assert.Contains(original, instructions);
+        Assert.Equal(OpCodes.Ret, instructions[^1].OpCode);
     }
 
     private sealed class Fixture : IDisposable
@@ -76,6 +107,8 @@ public sealed class LanNetworkPatchTests
         public MethodDefinition RawSocket { get; }
         public MethodDefinition Opened { get; }
         public MethodReference EngineConnect { get; }
+        public MethodReference EngineBind { get; }
+        public MethodDefinition HasArg { get; }
         public Instruction GuardStart { get; }
 
         public Fixture(bool tolerant = false)
@@ -87,6 +120,13 @@ public sealed class LanNetworkPatchTests
             require.Parameters.Add(new ParameterDefinition(_platform.TypeSystem.String));
             require.Parameters.Add(new ParameterDefinition(_platform.TypeSystem.Int32));
             policy.Methods.Add(require);
+            var listen = new MethodDefinition("ResolveListenAddress", MethodAttributes.Public | MethodAttributes.Static, _platform.TypeSystem.String);
+            listen.Parameters.Add(new ParameterDefinition(_platform.TypeSystem.String));
+            listen.Parameters.Add(new ParameterDefinition(_platform.TypeSystem.Int32));
+            policy.Methods.Add(listen);
+            var argument = new MethodDefinition("IsFastMultiplayerArgument", MethodAttributes.Public | MethodAttributes.Static, _platform.TypeSystem.Boolean);
+            argument.Parameters.Add(new ParameterDefinition(_platform.TypeSystem.String));
+            policy.Methods.Add(argument);
             var enet = new TypeReference("Godot", "ENetConnection", module, module.TypeSystem.CoreLibrary);
             var ctor = new MethodReference(".ctor", module.TypeSystem.Void, enet) { HasThis = true };
             EngineConnect = new MethodReference("ConnectToHost", module.TypeSystem.Object, enet) { HasThis = true };
@@ -104,10 +144,26 @@ public sealed class LanNetworkPatchTests
             il.Append(GuardStart);
             il.Emit(OpCodes.Pop);
             il.Emit(OpCodes.Ret);
-            Host = Method("Example", "Host", "Open");
-            Host.Body.GetILProcessor().Emit(OpCodes.Newobj, ctor);
-            Host.Body.GetILProcessor().Emit(OpCodes.Pop);
-            Host.Body.GetILProcessor().Emit(OpCodes.Ret);
+            Host = Method("MegaCrit.Sts2.Core.Multiplayer.Transport.ENet", "ENetHost", "StartHost");
+            EngineBind = new MethodReference("CreateHostBound", module.TypeSystem.Int32, enet) { HasThis = true };
+            EngineBind.Parameters.Add(new ParameterDefinition(module.TypeSystem.String));
+            for (int n = 0; n < 5; n++) EngineBind.Parameters.Add(new ParameterDefinition(module.TypeSystem.Int32));
+            il = Host.Body.GetILProcessor();
+            il.Emit(OpCodes.Newobj, ctor);
+            il.Emit(OpCodes.Ldstr, "*");
+            il.Emit(OpCodes.Ldc_I4, 33771);
+            il.Emit(OpCodes.Ldc_I4_4);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Ldc_I4_0);
+            il.Emit(OpCodes.Callvirt, EngineBind);
+            il.Emit(OpCodes.Pop);
+            il.Emit(OpCodes.Ret);
+            HasArg = Method("MegaCrit.Sts2.Core.Helpers", "CommandLineHelper", "HasArg");
+            HasArg.ReturnType = module.TypeSystem.Boolean;
+            HasArg.Parameters.Add(new ParameterDefinition(module.TypeSystem.String));
+            HasArg.Body.GetILProcessor().Emit(OpCodes.Ldc_I4_0);
+            HasArg.Body.GetILProcessor().Emit(OpCodes.Ret);
             RawSocket = Method("Example", "Discovery", "Broadcast");
             var socket = new TypeReference("System.Net.Sockets", "Socket", module, module.TypeSystem.CoreLibrary);
             RawSocket.Body.GetILProcessor().Emit(OpCodes.Call, new MethodReference("Open", module.TypeSystem.Void, socket));

@@ -12,7 +12,7 @@ public sealed class InstalledBuildTests : IDisposable
     [Fact]
     public void TheRecordReadsBackAsItWasWritten()
     {
-        var patches = new[] { new PatchOutcome("No mouse cursor", false, false, "not there"), new PatchOutcome("LAN joins use private or Tailscale addresses", true, true) };
+        var patches = new[] { new PatchOutcome("No mouse cursor", false, false, "not there"), new PatchOutcome("LAN hosts and joins use private or Tailscale addresses", true, true) };
         var written = new InstalledBuild(InstalledBuild.NormalBranch, 8653035385353091849, 23811903, "0.103.2", Tested: false, patches);
         written.Write(_game);
         var read = InstalledBuild.Read(_game)!;

@@ -113,7 +113,7 @@ public sealed class UntestedBuildTests : IDisposable
             "No second engine entry point", "Steam ownership checked by the launcher", "Steam Cloud through the launcher", "Player id from the signed-in account",
             "Player name from the signed-in account", "Saves in the app's Steam folder", "Links stay inside the app", "No desktop system report", "No desktop Steamworks start",
             "No Steam Workshop check", "Mod code only from the app", "No Harmony at run time", "No gameplay metrics sent", "No logs or screenshots sent as feedback",
-            "LAN joins use private or Tailscale addresses", "Crash reporting SDK removed", "The game's web requests go through the app's guard", "Save upgrades without run-time JSON code",
+            "LAN hosts and joins use private or Tailscale addresses", "Crash reporting SDK removed", "The game's web requests go through the app's guard", "Save upgrades without run-time JSON code",
             "Texture atlases read without run-time JSON code",
         ], steps.Where(step => step.Required).Select(step => step.Name));
         Assert.Equal(

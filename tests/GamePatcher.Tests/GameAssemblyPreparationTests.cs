@@ -191,7 +191,7 @@ public sealed class GameAssemblyPreparationTests : IDisposable
         File.WriteAllText(Path.Combine(_game, "Steamworks.NET.dll"), "x");
         File.WriteAllText(Path.Combine(_game, "SmartFormat.dll"), "x");
         File.WriteAllText(Path.Combine(_game, "SmartFormat.ZString.dll"), "x");
-        PatchOutcome[] report = [new("No mouse cursor", false, false, "gone"), new("LAN joins use private or Tailscale addresses", true, true)];
+        PatchOutcome[] report = [new("No mouse cursor", false, false, "gone"), new("LAN hosts and joins use private or Tailscale addresses", true, true)];
         var result = Untested(() => report).Run();
         Assert.Equal(PreparationStatus.Prepared, result.Status);
         Assert.False(result.Tested);
@@ -222,10 +222,10 @@ public sealed class GameAssemblyPreparationTests : IDisposable
         File.WriteAllText(Path.Combine(Original, "sts2.dll"), "another build");
         foreach (string name in new[] { "Steamworks.NET.dll", "SmartFormat.dll", "SmartFormat.ZString.dll" }) File.WriteAllText(Path.Combine(_game, name), "x");
         File.WriteAllText(Output, "earlier");
-        var result = Untested(() => throw new GamePatchRefusedException("LAN joins use private or Tailscale addresses", "Godot.ENetConnection is not in this game version.")).Run();
+        var result = Untested(() => throw new GamePatchRefusedException("LAN hosts and joins use private or Tailscale addresses", "Godot.ENetConnection is not in this game version.")).Run();
         Assert.Equal(PreparationStatus.Refused, result.Status);
         Assert.Contains("0.99.0", result.Message);
-        Assert.Contains("\"LAN joins use private or Tailscale addresses\"", result.Message);
+        Assert.Contains("\"LAN hosts and joins use private or Tailscale addresses\"", result.Message);
         Assert.Contains("Game version", result.Message);
         Assert.Equal("earlier", File.ReadAllText(Output));
         Assert.False(Directory.Exists(Path.Combine(_game, ".preparing")));

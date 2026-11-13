@@ -4,10 +4,33 @@ using System.Net.Sockets;
 
 namespace STS2Mobile.Platform;
 
-/// <summary>Explicit LAN joins only: private IPv4 or Tailscale addresses, never DNS or public internet hosts.</summary>
+/// <summary>Explicit LAN hosts and peers: private IPv4 or Tailscale addresses, never DNS or public internet hosts.</summary>
 public static class LanNetworkPolicy
 {
     public const int DefaultPort = 33771;
+
+    private static string? _hostAddress;
+    public static string? HostAddress => Volatile.Read(ref _hostAddress);
+
+    /// <summary>Select an interface for the next native Host/Load action. This does not open a socket.</summary>
+    public static void SelectHostAddress(string address)
+    {
+        RequirePeer(address, DefaultPort);
+        Volatile.Write(ref _hostAddress, address);
+    }
+
+    /// <summary>Replace the game's wildcard bind with the selected LAN/Tailscale interface.</summary>
+    public static string ResolveListenAddress(string requested, int port)
+    {
+        string selected = HostAddress ?? throw new NotSupportedException("Choose this iPhone's LAN host address before hosting.");
+        RequirePeer(selected, port);
+        if (port != DefaultPort || requested != "*" && requested != selected)
+            throw new NotSupportedException("LAN hosting uses the selected Wi-Fi or Tailscale address on UDP port 33771.");
+        return selected;
+    }
+
+    /// <summary>Keep the native Host and Load flows on ENet, without changing other command-line switches.</summary>
+    public static bool IsFastMultiplayerArgument(string argument) => argument == "fastmp";
 
     public static bool IsAllowedAddress(string? host)
     {
