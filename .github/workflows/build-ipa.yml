@@ -1,8 +1,8 @@
 # Builds the unsigned app from a clean checkout, with no secrets and no game files, for people with no Mac.
-# It runs only by hand (Actions > Build IPA > Run workflow) or when a tag named v* is pushed,
-# never on branch pushes or pull requests. A run by hand keeps the IPA as the run's artifact; a tag also publishes
-# it as a GitHub Release with an AltStore/SideStore source beside it. The scan must pass first, and only the IPA,
-# its icon and the source are uploaded: never logs or analysis/ folders.
+# Pushes and pull requests build a downloadable unsigned IPA automatically; workflow_dispatch can run it by hand.
+# Version tags additionally publish a release. Build jobs have read-only permissions and use no signing secrets.
+# Same-repository PR events are skipped because their branch push already builds the exact commit.
+# The scan must pass before uploading the IPA; game files and logs are never uploaded.
 #
 # Install it with Sideloadly, AltStore or SideStore and your own Apple ID (README, "Install without a Mac").
 name: Build IPA
@@ -10,10 +10,13 @@ name: Build IPA
 on:
   workflow_dispatch:
   push:
+    branches: ["**"]
     tags: ["v*"]
+  pull_request:
+    branches: ["main"]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: build-ipa-${{ github.ref }}
@@ -21,6 +24,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     # macOS 27 on Apple silicon. Each xcode-N image holds the Xcode N releases. tools/dependencies.json
     # names the one this checkout supports, and setup stops if DEVELOPER_DIR selects another.
     runs-on: xcode-27
@@ -90,32 +94,54 @@ jobs:
           echo "$newest"
           tail -n 40 "$newest"
 
+      - name: Stage downloadable files
+        run: |
+          mkdir -p .work/artifacts
+          cp analysis/full-game-mono/FullGame.ipa .work/artifacts/FullGame.ipa
+          cp src/STS2Mobile.FullGame/icon.png .work/artifacts/icon.png
+
       - name: Upload the IPA
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: STS2Mobile-unsigned-ipa
-          path: analysis/full-game-mono/FullGame.ipa
+          path: .work/artifacts/
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
 
+  release:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download the scanned app
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: STS2Mobile-unsigned-ipa
+          path: .work/artifacts
       - name: Publish the release
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          STS2_APP_VERSION="${GITHUB_REF_NAME#v}"
           release=.work/release
           mkdir -p "$release"
           ipa="STS2Mobile-$STS2_APP_VERSION.ipa"
-          cp analysis/full-game-mono/FullGame.ipa "$release/$ipa"
+          cp .work/artifacts/FullGame.ipa "$release/$ipa"
           base="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME"
-          tools/python/bin/python3 tools/make_altstore_source.py "$release/$ipa" \
+          python3 tools/make_altstore_source.py "$release/$ipa" \
             --download-url "$base/$ipa" --icon-url "$base/icon.png" \
             --website "https://github.com/$GITHUB_REPOSITORY" \
             --notes "Release $GITHUB_REF_NAME." \
             --output "$release/altstore-source.json"
           # The icon setup generates: the IPA's own icons are in Apple's altered PNG form.
-          cp src/STS2Mobile.FullGame/icon.png "$release/icon.png"
+          cp .work/artifacts/icon.png "$release/icon.png"
           cat > "$release/notes.md" <<EOF
           Unsigned IPA of STS2 Mobile $GITHUB_REF_NAME. It holds none of Slay the Spire 2: the app downloads the game from Steam after you sign in with an account that owns it.
 
