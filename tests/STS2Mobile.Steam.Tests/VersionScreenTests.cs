@@ -76,7 +76,7 @@ public sealed class VersionScreenTests : IDisposable
     public void AnUntestedBuildSaysWhatItPlaysWithout()
     {
         var stable = new InstalledBuild(GameInstaller.NormalBranch, StableNow.ManifestId, StableNow.BuildId, "0.103.2", Tested: false,
-            [new PatchOutcome("No mouse cursor", false, false, "gone"), new PatchOutcome("The game fills the screen", false, false, "gone"), new PatchOutcome("No LAN play", true, true)]);
+            [new PatchOutcome("No mouse cursor", false, false, "gone"), new PatchOutcome("The game fills the screen", false, false, "gone"), new PatchOutcome("LAN joins use private or Tailscale addresses", true, true)]);
         var screen = Screen(stable);
         Assert.Contains("It plays without: No mouse cursor; The game fills the screen.", screen.Status);
         Assert.Equal("v0.103.2, Stable, untested", screen.Facts[0].Value);

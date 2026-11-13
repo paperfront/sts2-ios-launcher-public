@@ -21,7 +21,7 @@ public static class LauncherPreview
     private static readonly InstalledBuild Beta = new(GameInstaller.BetaBranch, BetaNow.ManifestId, BetaNow.BuildId, "0.113.0", Tested: true);
     private static readonly InstalledBuild Stable = new(GameInstaller.NormalBranch, StableNow.ManifestId, StableNow.BuildId, "0.103.2", Tested: false,
         [new PatchOutcome("No mouse cursor", false, false, "MegaCrit.Sts2.Core.Nodes.CommonUi.NCursorManager.UpdateCursor is not in this game version."),
-         new PatchOutcome("No LAN play", true, true)]);
+         new PatchOutcome("LAN joins use private or Tailscale addresses", true, true)]);
 
     // A run finished on this iPhone after the last play on a computer: newer progress here, a newer setting there, and the computer's
     // unfinished run that the finished one replaces.
@@ -94,7 +94,7 @@ public static class LauncherPreview
             case "notprepared":
                 view.Step = SetupStep.Download;
                 view.SetNotice(Notice.Failure("Not prepared", "Game version 0.103.2 has not been tested with this app, and it cannot be prepared for this iPhone: the change "
-                    + "\"No LAN play\" does not fit it (Godot.ENetConnection is not in this game version.). The game cannot run without that change, so nothing was changed.\n"
+                    + "\"LAN joins use private or Tailscale addresses\" does not fit it (Godot.ENetConnection is not in this game version.). The game cannot run without that change, so nothing was changed.\n"
                     + "Choose the other version under Game version, or wait for an app update that supports this build."));
                 view.ShowEntry(EntryScreen.For(Facts with { NoGameReason = EntryScreen.NoGame }));
                 break;
