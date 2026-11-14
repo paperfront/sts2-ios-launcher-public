@@ -161,6 +161,21 @@ switches or deletes the game, **Cloud saves** gets your saves from Steam Cloud o
 account** changes the account or signs out, and **Mods** manages mods. None of them touch your saves without
 asking.
 
+## Internal TestFlight from GitHub Actions
+
+Register `io.github.paperfront.sts2mobile` as an explicit App ID (no optional capabilities) and create
+its iOS app record in App Store Connect. Under this repository’s **Settings > Secrets and variables >
+Actions**, add `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY` (the complete `.p8`
+text). Use an App Manager team API key with the signing permissions needed by automatic provisioning,
+as in the Poker Settle Up workflow. No `.p12` or manually downloaded provisioning profile is required.
+
+Choose **Actions > Build IPA > Run workflow**, select the LAN branch, and check **Sign and upload to
+internal TestFlight**. The workflow builds and scans the patched Mono app, archives that same export,
+lets Xcode manage distribution signing, validates the signed IPA, and uploads it to App Store Connect.
+Apple must process the upload before it appears under the app’s TestFlight tab. Add it to your internal
+tester group there. The build is marked internal-only; it cannot be distributed to external testers or
+the App Store. Normal push/PR builds remain unsigned and never receive the Apple secrets.
+
 ## Every 7 days, with a free Apple ID
 
 A free Apple ID's apps stop opening after 7 days. Connect the iPhone and run `./setup.sh --install` again. It
