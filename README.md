@@ -12,14 +12,50 @@ an unofficial fan project, not made or endorsed by Mega Crit or Valve.
 - **Your password goes only to Steam.** You sign in on Steam's own servers, as the Steam app does. The app
   never stores your password, only the sign-in Steam gives back, encrypted on your iPhone.
 - **There is no server of ours.** The app talks only to Steam and Mega Crit, plus a multiplayer relay if your
-  build has one. There are no analytics, ads or tracking, and the game's own crash reporting and stats uploads
-  are taken out.
+  build has one, and a friend’s private LAN/Tailscale address when you explicitly join a LAN game.
+  There are no analytics, ads or tracking, and the game’s own crash reporting and stats uploads are taken out.
 - **Nothing happens behind your back.** The game downloads, updates and syncs saves with Steam Cloud only when
   you press the button for it.
 - **You can read every line.** The app is built from this code, on your Mac or by this repository's
   GitHub Actions workflow, whose log anyone can read.
 
 The details are in [Security and privacy](#security-and-privacy) below.
+
+## LAN multiplayer with friends (no mods)
+
+An iPhone can host, and other iPhones can join it over the same Wi-Fi or Tailscale. Leave **Mods off**
+and use the same game version on every device (the pinned beta is v0.113.0). This integration still
+needs real-device gameplay testing; automated builds do not establish multiplayer compatibility.
+
+1. Put the phones on the same Wi-Fi, or connect them to a Tailscale network that permits connections
+   between them. Each player signs in to a Steam account that owns the game.
+2. On the hosting iPhone, open **Multiplayer > LAN host address**. Choose this phone’s Wi-Fi address
+   (such as `192.168.1.20`) or Tailscale address, then tap **Use and copy address**. You can also enter
+   this phone’s Tailscale IP manually if it is not listed. The panel closes automatically after copying;
+   its large **Close** button dismisses it without changing the address. Selection does not start a server.
+3. Choose **Host** and a game mode. The game’s built-in ENet server starts on the
+   selected interface at UDP port `33771`. Share the copied address with your friends.
+4. On each joining iPhone, open **Multiplayer > Join**, paste the address and tap **Join LAN**.
+   IPv4 can be entered as `192.168.1.20` or `192.168.1.20:33771`; Tailscale IPv6 uses `[address]:33771`.
+5. Allow **Local Network** access when iOS asks. Keep the host app open in the foreground throughout
+   the session. If hosting fails after changing networks, refresh and select the phone’s current address.
+
+To continue a saved run, the host chooses its LAN address again and uses the game’s normal **Load**
+action. Joining players connect to that address again. Save/load, quitting the lobby, and server teardown
+stay in the game’s native flow. Switching multiplayer modes can affect saves, so keep a backup.
+
+A Windows/Mac player can also host without installing mods: add `--fastmp` under **Steam > Slay the
+Spire 2 > Properties > Launch Options**, fully restart the game, and use **Multiplayer > Host**.
+The iPhones join the desktop’s Wi-Fi or Tailscale IP. Its firewall must permit the game’s UDP port.
+
+There is no broadcast discovery, public matchmaking or added room-password protocol. Only share an
+address reachable on your chosen Wi-Fi/Tailscale network; guest Wi-Fi may isolate devices, and Tailscale
+access rules must permit the connection. The phone binds only the selected private/Tailscale interface,
+never a wildcard. QuickMatch and its optional relay/voice features are separate and are not required.
+
+The native LAN mode follows the same `fastmp` switch used by the desktop game. The Android launcher
+documents the [desktop setup](https://github.com/Ekyso/StS2-Launcher#lan-multiplayer); this iOS integration
+is independent. Steam ownership verification remains required before the game starts.
 
 ## What you need
 
@@ -105,8 +141,11 @@ apps.
 
 ### Your own build, still without a Mac
 
-Fork this repository, open **Actions > Build IPA > Run workflow** in your fork, and after about 15 to 20
-minutes download the IPA from the run's **Artifacts** (a zip with the IPA inside). Pushing a tag such as
+This fork runs **Actions > Build IPA** automatically on branch pushes and external pull requests. You can
+also use **Run workflow** to start a build manually. After a successful run, download **STS2Mobile-unsigned-ipa**
+from its **Artifacts**; the zip contains `FullGame.ipa` and the app icon. Artifacts are retained for 7 days.
+The IPA is unsigned: sideload it with your own Apple ID using the instructions above. No Apple or Steam
+credentials are needed by the build. A same-repository pull request uses its branch-push build to avoid duplication. Pushing a tag such as
 `v1.0.0` to your fork also publishes a release with its own AltStore source, at the address above with your
 fork's owner and name.
 
@@ -123,6 +162,32 @@ switches or deletes the game, **Cloud saves** gets your saves from Steam Cloud o
 account** changes the account or signs out, and **Mods** manages mods. None of them touch your saves without
 asking.
 
+The game fills the display. The game owns the top bar and navigation controls. Build 11’s generic
+safe-area anchor adjustment was removed after it displaced the top bar on a physical phone; targeted
+corner padding remains pending verification against the actual game scene layout.
+
+The phone's Graphics settings include Battery Saver and Render Resolution. New installs use the
+Maximum preset from the first launch: 67% render resolution, 30 fps when idle, and a lower frame cap
+when hot. Touching restores the active cap immediately. The active cap never exceeds the display's
+refresh rate or the game's lower Max FPS setting. Resolution changes take effect after reopening.
+
+## Internal TestFlight from GitHub Actions
+
+Register `io.github.paperfront.sts2mobile` as an explicit App ID (no optional capabilities) and create
+its iOS app record in App Store Connect. Under this repository’s **Settings > Secrets and variables >
+Actions**, add `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY` (the complete `.p8`
+text). Use an **Admin team API key** so Xcode can use cloud-managed distribution certificates.
+An App Manager key can pass development signing and still fail distribution export with a cloud signing
+permission error. A generated key’s role cannot be edited: create an Admin key and replace `ASC_KEY_ID`
+and `ASC_PRIVATE_KEY` together. No `.p12` or manually downloaded provisioning profile is required.
+
+Choose **Actions > Build IPA > Run workflow**, select the LAN branch, and check **Sign and upload to
+internal TestFlight**. The workflow builds and scans the patched Mono app, archives that same export,
+lets Xcode manage distribution signing, validates the signed IPA, and uploads it to App Store Connect.
+Apple must process the upload before it appears under the app’s TestFlight tab. Add it to your internal
+tester group there. The build is marked internal-only; it cannot be distributed to external testers or
+the App Store. Normal push/PR builds remain unsigned and never receive the Apple secrets.
+
 ## Every 7 days, with a free Apple ID
 
 A free Apple ID's apps stop opening after 7 days. Connect the iPhone and run `./setup.sh --install` again. It
@@ -138,13 +203,15 @@ iPhone**: that deletes the game and the saves on it. Saves on the iPhone reach S
 - **Online co-op** works through QuickMatch, a matchmaking mod built into the app when its release is
   available, with voice chat when the build has a relay (see [Multiplayer](#multiplayer) below). Until
   QuickMatch's release is pinned in `tools/dependencies.json`, a fork builds without it, and so without
-  multiplayer; everything else works. The game's own online play needs Steamworks, which does not run on
-  iOS, and LAN play is turned off.
+  QuickMatch matchmaking; everything else, including the mod-free LAN join path, works independently.
+  The game’s own Steamworks online transport does not run on iOS.
+- **LAN co-op** uses the game’s built-in ENet host/client with Mods off. An iPhone or a desktop can host;
+  phones join by Wi-Fi or Tailscale IP. See [LAN multiplayer](#lan-multiplayer-with-friends-no-mods).
 
 ## Game versions
 
-The app has been tested with v0.113.0 from Steam's beta branch, and an iPhone still on v0.111.0 keeps
-playing it as tested. A newer Beta is still offered, marked
+The upstream app has been tested with v0.113.0 from Steam’s beta branch, and an iPhone still on v0.111.0 keeps
+playing it as tested. This fork’s LAN integration still needs device testing. A newer Beta is still offered, marked
 untested, and patched on the iPhone in a tolerant mode; if a change the game needs cannot be made to this
 build, the app tells you then. An untested Stable build is not offered until the app is tested with it. The
 app never updates the game by itself.
@@ -203,8 +270,8 @@ This section is for anyone who wants to check the claims above. Each point names
 
 ### What the app connects to
 
-Every connection goes through a policy in the code that allows only HTTPS or WSS on port 443 to named hosts,
-and refuses IP addresses, redirects, proxies, cookies and overridden Host headers
+Web and relay connections use policies that allow only HTTPS or WSS on port 443 to named hosts,
+and refuse IP addresses, redirects, proxies, cookies and overridden Host headers
 (`src/STS2Mobile.Steam/Network`, `src/STS2Mobile.Platform/GameNetworkPolicy.cs`). The allowed destinations:
 
 - **Steam**: sign-in, the ownership check, the game download (from `steamcontent.com`), Steam Cloud and lobbies.
@@ -214,6 +281,7 @@ and refuses IP addresses, redirects, proxies, cookies and overridden Host header
   own cloud API over the signed-in connection, never through the storage hosts.
 - **Mega Crit's and Steam's websites**, for the game's own web requests.
 - **A QuickMatch relay**, only if the build has one, only during a match (below).
+- **Private LAN/Tailscale game peers**, when you choose Host/Load or enter an IP and tap Join LAN.
 
 Nothing else. [NETWORK.md](NETWORK.md) lists each rule and the allowed hosts.
 
@@ -225,7 +293,8 @@ When the app prepares the game on your iPhone, it patches the game's code
 - Sentry crash reporting is removed completely.
 - Run, achievement and settings stats, and the feedback upload (logs and a screenshot), are removed: nothing
   is uploaded to anyone.
-- LAN play's raw network sockets are refused.
+- Raw network sockets are refused. ENet hosting binds only the selected private/Tailscale interface;
+  ENet joining permits private/Tailscale IP addresses only.
 
 The app's own log (`Documents/full-game-startup.log`) stays on the iPhone and is never sent anywhere.
 

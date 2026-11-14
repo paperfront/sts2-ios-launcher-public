@@ -29,6 +29,9 @@ public sealed partial class GameEntry : Node, IGameEntry
     {
         AddChild(_graphics);
         AddChild(_mods);
+        AddChild(new LanJoinScreen());
+        AddChild(new LanHostScreen());
+        AddChild(new HudLayoutReport());
     }
 
     /// <inheritdoc />

@@ -4,6 +4,7 @@ import zlib
 from pathlib import Path
 
 from prepare_full_game_xcode import (
+    LOCAL_NETWORK_PURPOSE,
     MICROPHONE_PURPOSE,
     NATIVE_UNITS,
     SCENE_DELEGATE_CLASS,
@@ -179,12 +180,12 @@ class InfoPropertyTests(unittest.TestCase):
             "UIRequiresFullScreen": True,
         }
         fill_purpose_strings(properties, with_voice=False)
-        self.assertEqual(properties, {"UIRequiresFullScreen": True})
+        self.assertEqual(properties, {"UIRequiresFullScreen": True, "NSLocalNetworkUsageDescription": LOCAL_NETWORK_PURPOSE})
 
     def test_voice_build_says_what_the_microphone_is_for(self):
         properties = {"NSMicrophoneUsageDescription": "", "NSCameraUsageDescription": ""}
         fill_purpose_strings(properties, with_voice=True)
-        self.assertEqual(properties, {"NSMicrophoneUsageDescription": MICROPHONE_PURPOSE})
+        self.assertEqual(properties, {"NSMicrophoneUsageDescription": MICROPHONE_PURPOSE, "NSLocalNetworkUsageDescription": LOCAL_NETWORK_PURPOSE})
 
 
 class SceneLifecycleTests(unittest.TestCase):

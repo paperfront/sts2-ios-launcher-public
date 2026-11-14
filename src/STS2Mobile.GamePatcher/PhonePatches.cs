@@ -75,10 +75,8 @@ internal static class PhonePatches
         patch.Record(cardPlayInput.FullName, "Put a picked-up card back when the touch is released below the play zone.");
     }
 
-    // The game's automatic aspect ratio stretches its canvas over the whole window, so on a phone with a notch or a Dynamic Island
-    // the island and the rounded corners covered what the game anchors to its left and right edges. Both of its handlers now ask
-    // SafeAreaCanvas for the canvas, which letterboxes it inside the safe area there and keeps the game's own rule elsewhere. Each
-    // keeps its check that the setting is automatic; only what follows it is replaced.
+    // Keep the full-screen canvas rule in one adapter. PhoneHudSafeArea moves edge controls inward without
+    // letterboxing the map, backgrounds or combat. Each handler keeps its existing automatic-setting check.
     private static void KeepClearOfTheNotch(GamePatch patch)
     {
         FitCanvasToSafeArea(patch, patch.Method("MegaCrit.Sts2.Core.Nodes.CommonUi.NGlobalUi", "OnWindowChange"));
@@ -130,7 +128,7 @@ internal static class PhonePatches
         int end = start + fit.Length;
         while (code.Count > end) il.RemoveAt(end);
         body.OptimizeMacros();
-        patch.Record(handler.FullName, "Letterbox the automatic aspect ratio's canvas inside the safe area, clear of the notch, the island and the rounded corners.");
+        patch.Record(handler.FullName, "Keep the automatic canvas full-screen; the host insets edge HUD controls separately.");
     }
 
     // A phone has one window that always covers the screen. The game's saved aspect ratio (16:9 unless

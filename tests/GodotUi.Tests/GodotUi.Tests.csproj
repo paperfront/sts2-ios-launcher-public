@@ -1,0 +1,11 @@
+<Project Sdk="Godot.NET.Sdk/4.5.1">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/STS2Mobile.GameHost/STS2Mobile.GameHost.csproj" />
+    <ProjectReference Include="../../src/STS2Mobile.GameStub/STS2Mobile.GameStub.csproj" />
+  </ItemGroup>
+</Project>

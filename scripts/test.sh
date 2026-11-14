@@ -29,4 +29,17 @@ if ! dotnet run --project tests/SteamWire.Tests > "$log" 2>&1; then
     exit 1
 fi
 tail -1 "$log"
+# Exercise the real GUI input path, including touch-driven Close, without loading any game files.
+log=.work/logs/godot-ui.log
+if ! dotnet build tests/GodotUi.Tests > "$log" 2>&1; then
+    echo "Godot UI harness failed to build. See $log" >&2
+    exit 1
+fi
+if ! DOTNET_ROLL_FORWARD=LatestMajor scripts/godot.sh --headless --path tests/GodotUi.Tests --fixed-fps 60 --quit-after 600 >> "$log" 2>&1; then
+    echo "Godot UI interactions failed. See $log" >&2
+    exit 1
+fi
+# Godot can exit successfully at --quit-after even if a script did not load, so require both completion marks.
+test "$(grep -c '^LAN panel pointer interactions passed' "$log")" -eq 2
+tail -2 "$log"
 echo 'Tests passed. Logs: .work/logs'

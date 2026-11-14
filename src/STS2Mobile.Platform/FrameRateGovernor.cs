@@ -12,11 +12,12 @@ public static class FrameRateGovernor
     public const int CriticalFrameRate = 20;
 
     /// <param name="gameLimit">The game's Max FPS setting; 0 or less means no limit, as for <c>Engine.MaxFps</c>.</param>
+    /// <param name="displayLimit">The display's refresh rate. A positive value also bounds an unlimited desktop setting.</param>
     /// <returns>The value for <c>Engine.MaxFps</c>; 0 means no limit.</returns>
-    public static int Target(int gameLimit, PhoneGraphicsSettings settings, bool touching, double secondsSinceTouch, int thermalState)
+    public static int Target(int gameLimit, PhoneGraphicsSettings settings, bool touching, double secondsSinceTouch, int thermalState, int displayLimit = 0)
     {
-        int cap = int.MaxValue;
-        if (settings.LowerIdleFrameRate && !touching && secondsSinceTouch >= IdleAfterSeconds) cap = IdleFrameRate;
+        int cap = displayLimit > 0 ? displayLimit : int.MaxValue;
+        if (settings.LowerIdleFrameRate && !touching && secondsSinceTouch >= IdleAfterSeconds) cap = Math.Min(cap, IdleFrameRate);
         if (settings.CoolDownWhenHot && thermalState >= DevicePower.Critical) cap = Math.Min(cap, CriticalFrameRate);
         else if (settings.CoolDownWhenHot && thermalState >= DevicePower.Serious) cap = Math.Min(cap, SeriousFrameRate);
         if (gameLimit <= 0) return cap == int.MaxValue ? 0 : cap;

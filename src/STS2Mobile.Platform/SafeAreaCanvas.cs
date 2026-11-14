@@ -1,16 +1,8 @@
 namespace STS2Mobile.Platform;
 
 /// <summary>
-/// The game's canvas on the phone, kept clear of the notch or the Dynamic Island and the rounded corners. The game's patched
-/// window handlers (<c>NGlobalUi.OnWindowChange</c> and <c>NMainMenu.OnWindowChange</c>) call <see cref="Layout"/> in place of
-/// their own automatic aspect ratio, which stretched the canvas over the whole 19.5:9 screen, so the island and the corners
-/// covered whatever the game anchors to its left and right edges.
-/// <para>
-/// In landscape iOS reports the same inset on both sides of a phone with a notch or an island, whichever side it is on, so a
-/// canvas as wide as the screen less both insets, letterboxed in the middle (Godot's Keep), lands exactly inside the safe area.
-/// The bars are black, under the island. The game then lays out as it does on a desktop monitor of that shape. The home
-/// indicator's inset at the bottom is left out: it only overlays the bottom edge, it cuts nothing off.
-/// </para>
+/// The game's full-screen automatic canvas. Safe-area insets belong to the HUD, not to the world canvas:
+/// letterboxing here would also shrink backgrounds, the map and combat. The host insets edge controls separately.
 /// </summary>
 public static unsafe class SafeAreaCanvas
 {
@@ -31,40 +23,25 @@ public static unsafe class SafeAreaCanvas
 
     /// <summary>The canvas for a window of this many pixels: the aspect mode to set, and the canvas size through the out values.</summary>
     public static long Layout(int windowWidth, int windowHeight, out int canvasWidth, out int canvasHeight) =>
-        Choose(windowWidth, windowHeight, SideInset(), out canvasWidth, out canvasHeight);
+        Choose(windowWidth, windowHeight, 0, out canvasWidth, out canvasHeight);
 
     /// <summary>
-    /// <see cref="Layout"/> for a given side inset. With none it is the game's own rule, unchanged. With one, the canvas has the shape
-    /// of the screen less both insets, at the game's height of 1080 and no wider than its widest layout (21:9), and is letterboxed.
+    /// Keep the game's full-screen rule even when a side inset exists. The inset parameter is retained for callers of older builds.
     /// </summary>
     public static long Choose(int windowWidth, int windowHeight, double sideInset, out int canvasWidth, out int canvasHeight)
     {
-        if (windowWidth <= 0 || windowHeight <= 0 || !(sideInset > 0) || sideInset >= 0.5)
+        float shape = windowHeight > 0 ? (float)windowWidth / windowHeight : 0;
+        if (shape > WidestRatio)
         {
-            float shape = windowHeight > 0 ? (float)windowWidth / windowHeight : 0;
-            if (shape > WidestRatio)
-            {
-                (canvasWidth, canvasHeight) = (WidestWidth, BaseHeight);
-                return KeepWidth;
-            }
-            if (shape < NarrowestRatio)
-            {
-                (canvasWidth, canvasHeight) = (BaseWidth, TallestHeight);
-                return KeepHeight;
-            }
-            (canvasWidth, canvasHeight) = (BaseWidth, BaseHeight);
-            return Expand;
+            (canvasWidth, canvasHeight) = (WidestWidth, BaseHeight);
+            return KeepWidth;
         }
-        double ratio = windowWidth * (1 - 2 * sideInset) / windowHeight;
-        if (ratio >= (double)BaseWidth / BaseHeight)
+        if (shape < NarrowestRatio)
         {
-            // Rounded down, so the letterboxed canvas is never wider than the safe area.
-            (canvasWidth, canvasHeight) = (Math.Min((int)Math.Floor(BaseHeight * ratio), WidestWidth), BaseHeight);
+            (canvasWidth, canvasHeight) = (BaseWidth, TallestHeight);
+            return KeepHeight;
         }
-        else
-        {
-            (canvasWidth, canvasHeight) = (BaseWidth, (int)Math.Ceiling(BaseWidth / ratio));
-        }
-        return Keep;
+        (canvasWidth, canvasHeight) = (BaseWidth, BaseHeight);
+        return Expand;
     }
 }

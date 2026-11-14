@@ -9,7 +9,6 @@ namespace STS2Mobile.GamePatcher.Tests;
 /// </summary>
 public sealed class UntestedBuildTests : IDisposable
 {
-    private const string PlayedSha256 = "c00cf938078c407dbf9af5616d0e4a665ae779bc68a08a5e31223ff149dc983e";
     private readonly string _work = Directory.CreateTempSubdirectory("untested-build-").FullName;
 
     public void Dispose() => Directory.Delete(_work, recursive: true);
@@ -46,7 +45,7 @@ public sealed class UntestedBuildTests : IDisposable
         string output = Path.Combine(_work, "tolerant");
         Directory.CreateDirectory(output);
         var built = GameAssemblyBuilder.Build(InstalledGame.Data!, [], output, tolerant: true);
-        Assert.Equal(PlayedSha256, InstalledGame.Sha(Path.Combine(output, GameProfile.GameAssembly)));
+        Assert.Equal(InstalledGame.UnmoddedSha256, InstalledGame.Sha(Path.Combine(output, GameProfile.GameAssembly)));
         Assert.All(built.Patches, patch => Assert.True(patch.Applied, patch.Name));
         Assert.All(built.Patches, patch => Assert.Null(patch.Note));
         Assert.Equal(GameAssemblyBuilder.PatchList().Select(step => step.Name), built.Patches.Select(patch => patch.Name));
@@ -63,7 +62,7 @@ public sealed class UntestedBuildTests : IDisposable
         Assert.Equal("No mouse cursor", skipped.Name);
         Assert.False(skipped.Required);
         Assert.Contains("UpdateCursor is not in this game version", skipped.Note);
-        Assert.NotEqual(PlayedSha256, result.OutputSha256);
+        Assert.NotEqual(InstalledGame.UnmoddedSha256, result.OutputSha256);
 
         var again = InstalledGame.WithoutBuiltIns(game).Run();
         Assert.Equal(PreparationStatus.Cached, again.Status);
@@ -90,8 +89,8 @@ public sealed class UntestedBuildTests : IDisposable
         string game = GameFolder();
         var result = InstalledGame.WithoutBuiltIns(game).Run();
         Assert.True(result.Tested);
-        Assert.Equal(InstalledGameTests.ModsOnSha256, result.OutputSha256);
-        Assert.Equal(PlayedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.unmodded.dll")));
+        Assert.Equal(InstalledGame.ModsOnSha256, result.OutputSha256);
+        Assert.Equal(InstalledGame.UnmoddedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.unmodded.dll")));
     }
 
     [InstalledGameFact]
@@ -114,7 +113,7 @@ public sealed class UntestedBuildTests : IDisposable
             "No second engine entry point", "Steam ownership checked by the launcher", "Steam Cloud through the launcher", "Player id from the signed-in account",
             "Player name from the signed-in account", "Saves in the app's Steam folder", "Links stay inside the app", "No desktop system report", "No desktop Steamworks start",
             "No Steam Workshop check", "Mod code only from the app", "No Harmony at run time", "No gameplay metrics sent", "No logs or screenshots sent as feedback",
-            "No LAN play", "Crash reporting SDK removed", "The game's web requests go through the app's guard", "Save upgrades without run-time JSON code",
+            "LAN hosts and joins use private or Tailscale addresses", "Crash reporting SDK removed", "The game's web requests go through the app's guard", "Save upgrades without run-time JSON code",
             "Texture atlases read without run-time JSON code",
         ], steps.Where(step => step.Required).Select(step => step.Name));
         Assert.Equal(

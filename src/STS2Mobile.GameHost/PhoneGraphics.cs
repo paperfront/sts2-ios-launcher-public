@@ -33,6 +33,10 @@ public sealed partial class PhoneGraphics : Node
     private string _path = "";
     private double _appliedFactor = 1;
     private double _lastTouch;
+    private double _nextThermalSample;
+    private int _thermalState = DevicePower.UnknownThermalState;
+    private int _displayLimit = 60;
+    private Timer? _governor;
     private bool _gameRunning;
     private bool _focused = true;
     private MegaRichTextLabel? _resolutionLabel;
@@ -48,6 +52,10 @@ public sealed partial class PhoneGraphics : Node
             GD.Print("Phone graphics: ", _settings.Describe(_appliedFactor));
             GetTree().Root.WindowInput += OnWindowInput;
             GetTree().NodeAdded += OnNodeAdded;
+            ReadDisplayLimit();
+            _governor = new Timer { WaitTime = 0.25, Autostart = true, ProcessMode = ProcessModeEnum.Always };
+            _governor.Timeout += ApplyFrameLimit;
+            AddChild(_governor);
         }
         catch (Exception error)
         {
@@ -70,6 +78,8 @@ public sealed partial class PhoneGraphics : Node
                 Store(_settings with { MsaaCleared = true });
             }
             _gameRunning = true;
+            _lastTouch = Now();
+            ApplyFrameLimit();
         }
         catch (Exception error)
         {
@@ -77,15 +87,20 @@ public sealed partial class PhoneGraphics : Node
         }
     }
 
-    public override void _Process(double delta)
+    private void ApplyFrameLimit()
     {
         if (!_gameRunning || !_focused) return;
         try
         {
             double now = Now();
             if (_touches.Count > 0) _lastTouch = now;
+            if (_settings.CoolDownWhenHot && now >= _nextThermalSample)
+            {
+                _thermalState = DevicePower.ThermalState();
+                _nextThermalSample = now + 1;
+            }
             int target = FrameRateGovernor.Target(SaveManager.Instance.SettingsSave.FpsLimit, _settings, _touches.Count > 0,
-                now - _lastTouch, _settings.CoolDownWhenHot ? DevicePower.ThermalState() : DevicePower.UnknownThermalState);
+                now - _lastTouch, _settings.CoolDownWhenHot ? _thermalState : DevicePower.UnknownThermalState, _displayLimit);
             if (Engine.MaxFps != target) Engine.MaxFps = target;
         }
         catch (Exception error)
@@ -97,11 +112,19 @@ public sealed partial class PhoneGraphics : Node
     public override void _Notification(int what)
     {
         // While the app is in the background the game's own handler owns the frame cap.
-        if (what == NotificationApplicationFocusOut) _focused = false;
+        if (what == NotificationApplicationFocusOut)
+        {
+            _focused = false;
+            // A touch-up can be lost when iOS backgrounds the app. Do not stay in the active cap forever.
+            _touches.Clear();
+        }
         else if (what == NotificationApplicationFocusIn)
         {
             _focused = true;
             _lastTouch = Now();
+            _nextThermalSample = 0;
+            ReadDisplayLimit();
+            ApplyFrameLimit();
         }
     }
 
@@ -112,8 +135,22 @@ public sealed partial class PhoneGraphics : Node
             if (touch.Pressed) _touches.Add(touch.Index);
             else _touches.Remove(touch.Index);
             _lastTouch = Now();
+            // Restore the active cap on the first touch, without waiting for the 250 ms timer.
+            if (touch.Pressed && _touches.Count == 1) ApplyFrameLimit();
         }
         else if (input is InputEventScreenDrag) _lastTouch = Now();
+    }
+
+    private void ReadDisplayLimit()
+    {
+        double refresh = DisplayServer.ScreenGetRefreshRate();
+        _displayLimit = double.IsFinite(refresh) && refresh > 0 ? Math.Max(1, (int)Math.Round(refresh)) : 60;
+    }
+
+    public override void _ExitTree()
+    {
+        GetTree().Root.WindowInput -= OnWindowInput;
+        GetTree().NodeAdded -= OnNodeAdded;
     }
 
     private void OnNodeAdded(Node node)
@@ -178,6 +215,8 @@ public sealed partial class PhoneGraphics : Node
     {
         if (settings == _settings) return;
         _settings = settings;
+        _nextThermalSample = 0;
+        ApplyFrameLimit();
         try
         {
             _settings.Save(_path);
@@ -203,6 +242,6 @@ public sealed partial class PhoneGraphics : Node
     {
         GD.PushError("Phone graphics disabled: " + error.GetType().Name + ": " + error.Message);
         _gameRunning = false;
-        SetProcess(false);
+        _governor?.Stop();
     }
 }

@@ -28,6 +28,26 @@ internal static class InstalledGame
         return File.Exists(game) && Sha(game) == GameProfile.Current.Inputs[GameProfile.GameAssembly] ? folder : null;
     }
 
+    // These comparisons check independent pipeline runs, not phone-verified gameplay. The previous
+    // pre-LAN phone-played outputs were c00cf938078c407dbf9af5616d0e4a665ae779bc68a08a5e31223ff149dc983e
+    // (mods off) and 63a6fb1788b417ec9f0d0206261f94890cb6463ab6f6bf0f5fce6c32c527d64f (mods on).
+    // A new played-output pin must only be recorded after testing the LAN build on a phone.
+    private static readonly Lazy<string> Unmodded = new(() => BuildHash(false));
+    private static readonly Lazy<string> Modded = new(() => BuildHash(true));
+    public static string UnmoddedSha256 => Unmodded.Value;
+    public static string ModsOnSha256 => Modded.Value;
+
+    private static string BuildHash(bool modsOn)
+    {
+        string output = Directory.CreateTempSubdirectory("lan-reference-").FullName;
+        try
+        {
+            GameAssemblyBuilder.Build(Data!, [], output, modsOn: modsOn);
+            return Sha(Path.Combine(output, GameProfile.GameAssembly));
+        }
+        finally { Directory.Delete(output, recursive: true); }
+    }
+
     public static string Sha(string path) => Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path)));
 
     /// <summary>The app's preparation as a build without built-in mods makes it, whatever setup fetched into this checkout.</summary>
@@ -35,18 +55,9 @@ internal static class InstalledGame
         GameAssemblyPreparation.ForApp(game, includeImportedMods, _ => [], new HashSet<string>());
 }
 
-/// <summary>
-/// The app's preparation on v0.113.0, pinned to the assembly first played on the phone. Update the pin when a patch changes on purpose, and only
-/// after a fight on the phone: nothing else tells whether the new assembly plays.
-/// </summary>
+/// <summary>App/tool pipeline consistency on the real game. Gameplay must also be verified on a phone.</summary>
 public sealed class InstalledGameTests : IDisposable
 {
-    /// <summary>The patched assembly with no mods, byte for byte the one first played on the phone.</summary>
-    private const string PlayedSha256 = "c00cf938078c407dbf9af5616d0e4a665ae779bc68a08a5e31223ff149dc983e";
-
-    /// <summary>The same with the launcher's mods switch on and no mods: <see cref="PlayedSha256"/> plus the mods agreement.</summary>
-    internal const string ModsOnSha256 = "63a6fb1788b417ec9f0d0206261f94890cb6463ab6f6bf0f5fce6c32c527d64f";
-
     private readonly string _work = Directory.CreateTempSubdirectory("installed-game-").FullName;
 
     public void Dispose() => Directory.Delete(_work, recursive: true);
@@ -73,15 +84,15 @@ public sealed class InstalledGameTests : IDisposable
         var mod = Assert.Single(mods);
         Assert.Equal("QuickRestart", mod.Id);
         Assert.Equal(3, mod.Patches);
-        Assert.Equal(PlayedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.unmodded.dll")));
+        Assert.Equal(InstalledGame.UnmoddedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.unmodded.dll")));
         Assert.Equal(PreparationStatus.Cached, InstalledGame.WithoutBuiltIns(game).Run().Status);
         Assert.Equal(PreparationStatus.Prepared, InstalledGame.WithoutBuiltIns(game, includeImportedMods: false).Run().Status);
-        Assert.Equal(PlayedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.dll")));
+        Assert.Equal(InstalledGame.UnmoddedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.dll")));
         Assert.Equal(PreparationStatus.Prepared, InstalledGame.WithoutBuiltIns(game).Run().Status);
         STS2Mobile.Platform.ModPackageImport.Delete(inputs, "QuickRestart");
         Assert.Equal(PreparationStatus.Prepared, InstalledGame.WithoutBuiltIns(game).Run().Status);
         Assert.Empty(STS2Mobile.Platform.BuiltInMods.ParseCatalog(File.ReadAllText(Path.Combine(game, GameFolder.ModCatalog))));
-        Assert.Equal(PlayedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.dll")));
+        Assert.Equal(InstalledGame.UnmoddedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.dll")));
     }
 
     [InstalledGameFact]
@@ -90,9 +101,9 @@ public sealed class InstalledGameTests : IDisposable
         string game = GameFolderWithOnlyWhatThePhoneHas();
         var result = InstalledGame.WithoutBuiltIns(game).Run();
         Assert.Equal(PreparationStatus.Prepared, result.Status);
-        Assert.Equal(ModsOnSha256, result.OutputSha256);
-        Assert.Equal(ModsOnSha256, InstalledGame.Sha(Path.Combine(game, GameProfile.GameAssembly)));
-        Assert.Equal(PlayedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.unmodded.dll")));
+        Assert.Equal(InstalledGame.ModsOnSha256, result.OutputSha256);
+        Assert.Equal(InstalledGame.ModsOnSha256, InstalledGame.Sha(Path.Combine(game, GameProfile.GameAssembly)));
+        Assert.Equal(InstalledGame.UnmoddedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.unmodded.dll")));
         Assert.Equal("{\n  \"mods\": []\n}\n", File.ReadAllText(Path.Combine(game, GameFolder.ModCatalog)));
         Assert.Equal(PreparationStatus.Cached, InstalledGame.WithoutBuiltIns(game).Run().Status);
     }
@@ -103,7 +114,7 @@ public sealed class InstalledGameTests : IDisposable
         string output = Path.Combine(_work, "mac");
         Directory.CreateDirectory(output);
         GameAssemblyBuilder.Build(InstalledGame.Data!, [], output);
-        Assert.Equal(PlayedSha256, InstalledGame.Sha(Path.Combine(output, GameProfile.GameAssembly)));
+        Assert.Equal(InstalledGame.UnmoddedSha256, InstalledGame.Sha(Path.Combine(output, GameProfile.GameAssembly)));
     }
 
     [InstalledGameFact]
@@ -115,10 +126,10 @@ public sealed class InstalledGameTests : IDisposable
         File.WriteAllText(Path.Combine(imported, "Broken.json"), "{\"id\":\"Broken\",\"has_dll\":true}");
         Assert.Equal(PreparationStatus.Refused, InstalledGame.WithoutBuiltIns(game).Run().Status);
         Assert.Equal(PreparationStatus.Prepared, InstalledGame.WithoutBuiltIns(game, includeImportedMods: false).Run().Status);
-        Assert.Equal(PlayedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.unmodded.dll")));
+        Assert.Equal(InstalledGame.UnmoddedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.unmodded.dll")));
         Assert.Equal(PreparationStatus.Cached, InstalledGame.WithoutBuiltIns(game, includeImportedMods: false).Run().Status);
         Assert.Equal(PreparationStatus.Refused, InstalledGame.WithoutBuiltIns(game).Run().Status);
-        Assert.Equal(PlayedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.unmodded.dll")));
+        Assert.Equal(InstalledGame.UnmoddedSha256, InstalledGame.Sha(Path.Combine(game, "sts2.unmodded.dll")));
     }
 
     /// <summary>

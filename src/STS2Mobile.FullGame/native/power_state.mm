@@ -9,29 +9,31 @@
 // scale to the app before the engine starts therefore makes it draw fewer pixels with every one of
 // those staying consistent, and iOS scales the picture up to the screen. The choice is read from
 // Documents/phone-graphics.json (written by PhoneGraphicsSettings.cs, key "renderScale") once,
-// before main, so a change takes effect at the next launch. Without the file nothing is changed.
+// before main, so a change takes effect at the next launch. Without a readable file the same
+// Maximum preset as PhoneGraphicsSettings.Default applies from the first launch.
 #import <UIKit/UIKit.h>
 #import <mach/mach.h>
 #import <objc/runtime.h>
 #import <sys/resource.h>
 
 static CGFloat gRenderScale = 1.0;
+static constexpr CGFloat kDefaultRenderScale = 2.0 / 3.0;
 static IMP gScreenScale = NULL;
 
 static CGFloat STS2ReadRenderScale(void) {
 	NSString *documents = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
 	NSData *data = [NSData dataWithContentsOfFile:[documents stringByAppendingPathComponent:@"phone-graphics.json"]];
 	if (!data) {
-		return 1.0;
+		return kDefaultRenderScale;
 	}
 	id root = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
 	id value = [root isKindOfClass:[NSDictionary class]] ? root[@"renderScale"] : nil;
 	if (![value isKindOfClass:[NSNumber class]]) {
-		return 1.0;
+		return kDefaultRenderScale;
 	}
 	double scale = [value doubleValue];
 	// Never below half the screen's resolution, never above it.
-	return (scale >= 0.5 && scale < 1.0) ? scale : 1.0;
+	return (scale >= 0.5 && scale <= 1.0) ? scale : kDefaultRenderScale;
 }
 
 static CGFloat STS2ScreenScale(id self, SEL _cmd) {
