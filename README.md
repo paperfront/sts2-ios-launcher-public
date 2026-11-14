@@ -166,8 +166,10 @@ asking.
 Register `io.github.paperfront.sts2mobile` as an explicit App ID (no optional capabilities) and create
 its iOS app record in App Store Connect. Under this repository’s **Settings > Secrets and variables >
 Actions**, add `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, and `ASC_PRIVATE_KEY` (the complete `.p8`
-text). Use an App Manager team API key with the signing permissions needed by automatic provisioning,
-as in the Poker Settle Up workflow. No `.p12` or manually downloaded provisioning profile is required.
+text). Use an **Admin team API key** so Xcode can use cloud-managed distribution certificates.
+An App Manager key can pass development signing and still fail distribution export with a cloud signing
+permission error. A generated key’s role cannot be edited: create an Admin key and replace `ASC_KEY_ID`
+and `ASC_PRIVATE_KEY` together. No `.p12` or manually downloaded provisioning profile is required.
 
 Choose **Actions > Build IPA > Run workflow**, select the LAN branch, and check **Sign and upload to
 internal TestFlight**. The workflow builds and scans the patched Mono app, archives that same export,
