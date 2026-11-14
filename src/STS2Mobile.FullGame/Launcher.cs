@@ -41,6 +41,8 @@ public partial class Launcher : Control
 
     public override void _Ready()
     {
+        // Only the Files picker needs frame polling; the launcher otherwise runs through signals/tasks.
+        SetProcess(false);
         SessionStats.Mark("launcher-ready");
         GetTree().Root.CallDeferred(Node.MethodName.AddChild, new SessionStats());
         LauncherOrientation.UsePortrait(GetWindow());

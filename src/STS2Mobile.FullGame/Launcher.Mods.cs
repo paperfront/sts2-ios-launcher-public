@@ -50,6 +50,7 @@ public partial class Launcher
             return;
         }
         _modPicking = true;
+        SetProcess(true);
     }
 
     public override void _Process(double delta)
@@ -58,6 +59,7 @@ public partial class Launcher
         var result = FilesPicker.Poll(out string? path);
         if (result == FilesPickerResult.Nothing) return;
         _modPicking = false;
+        SetProcess(false);
         if (result == FilesPickerResult.Picked) ImportModAsync(path!).FireAndForget("Import mod");
         else
         {

@@ -39,4 +39,20 @@ public class FrameRateGovernorTests
     [InlineData(DevicePower.UnknownThermalState, 60)]
     public void HeatLowersTheCapByThermalState(int thermalState, int expected) =>
         Assert.Equal(expected, FrameRateGovernor.Target(60, Cool, true, 0, thermalState));
+
+    [Theory]
+    [InlineData(0, 60, 60)]
+    [InlineData(144, 60, 60)]
+    [InlineData(144, 120, 120)]
+    [InlineData(24, 120, 24)]
+    [InlineData(0, -1, 0)]
+    public void DisplayCapBoundsOnlyFramesTheScreenCannotPresent(int gameLimit, int displayLimit, int expected) =>
+        Assert.Equal(expected, FrameRateGovernor.Target(gameLimit, Off, true, 0, DevicePower.Nominal, displayLimit));
+
+    [Fact]
+    public void IdleAndHeatNeverRaiseASlowerDisplayCap()
+    {
+        Assert.Equal(20, FrameRateGovernor.Target(120, Idle, false, 10, DevicePower.Nominal, 20));
+        Assert.Equal(15, FrameRateGovernor.Target(120, Cool, true, 0, DevicePower.Critical, 15));
+    }
 }

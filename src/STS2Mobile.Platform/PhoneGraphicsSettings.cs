@@ -17,8 +17,8 @@ public sealed record PhoneGraphicsSettings(RenderResolution Resolution, bool Low
 
     /// <summary>
     /// A new install's choices, the Maximum preset: Low resolution, 30 fps when idle and cooling down when hot.
-    /// The first launch still draws at full resolution, since the file is written once the
-    /// game has started and the native code reads it before the next launch's engine starts.
+    /// Native startup uses this same render scale when the settings file is absent or unreadable,
+    /// so a first install does not need a restart to receive the preset's reduced pixel workload.
     /// </summary>
     public static readonly PhoneGraphicsSettings Default = new(RenderResolution.Low, true, true, false);
 

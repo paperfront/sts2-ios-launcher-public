@@ -161,6 +161,15 @@ switches or deletes the game, **Cloud saves** gets your saves from Steam Cloud o
 account** changes the account or signs out, and **Mods** manages mods. None of them touch your saves without
 asking.
 
+The game fills the display. On iPhone, the top bar and Back/Proceed controls are inset around the safe
+area and rounded corners; the map and other backgrounds keep using the full screen. Layout follows
+rotation and the chosen render resolution.
+
+The phone's Graphics settings include Battery Saver and Render Resolution. New installs use the
+Maximum preset from the first launch: 67% render resolution, 30 fps when idle, and a lower frame cap
+when hot. Touching restores the active cap immediately. The active cap never exceeds the display's
+refresh rate or the game's lower Max FPS setting. Resolution changes take effect after reopening.
+
 ## Internal TestFlight from GitHub Actions
 
 Register `io.github.paperfront.sts2mobile` as an explicit App ID (no optional capabilities) and create

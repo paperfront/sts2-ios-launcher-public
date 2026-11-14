@@ -31,6 +31,7 @@ public sealed partial class GameEntry : Node, IGameEntry
         AddChild(_mods);
         AddChild(new LanJoinScreen());
         AddChild(new LanHostScreen());
+        AddChild(new PhoneHudSafeArea());
     }
 
     /// <inheritdoc />
