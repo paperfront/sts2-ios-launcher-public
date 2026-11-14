@@ -108,7 +108,15 @@ jobs:
           df -h .
           newest="$(ls -t .work/logs/*.log analysis/full-game-ios/export.log 2>/dev/null | grep -v '/ci-' | head -1 || true)"
           echo "$newest"
-          tail -n 40 "$newest"
+          if [[ -f "$newest" ]]; then tail -n 70 "$newest"; fi
+          if [[ -f analysis/full-game-ios/export.log ]]; then
+            echo "Godot host export log"
+            tail -n 180 analysis/full-game-ios/export.log
+          fi
+          godot_logs="$HOME/Library/Application Support/Godot/mono/build_logs"
+          if [[ -d "$godot_logs" ]]; then
+            find "$godot_logs" -name msbuild_log.txt -exec tail -n 100 {} \;
+          fi
 
       - name: Stage downloadable files
         run: |
