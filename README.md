@@ -161,9 +161,9 @@ switches or deletes the game, **Cloud saves** gets your saves from Steam Cloud o
 account** changes the account or signs out, and **Mods** manages mods. None of them touch your saves without
 asking.
 
-The game fills the display. On iPhone, the top bar and Back/Proceed controls are inset around the safe
-area and rounded corners; the map and other backgrounds keep using the full screen. Layout follows
-rotation and the chosen render resolution.
+The game fills the display. The game owns the top bar and navigation controls. Build 11’s generic
+safe-area anchor adjustment was removed after it displaced the top bar on a physical phone; targeted
+corner padding remains pending verification against the actual game scene layout.
 
 The phone's Graphics settings include Battery Saver and Render Resolution. New installs use the
 Maximum preset from the first launch: 67% render resolution, 30 fps when idle, and a lower frame cap
