@@ -31,8 +31,9 @@ needs real-device gameplay testing; automated builds do not establish multiplaye
    between them. Each player signs in to a Steam account that owns the game.
 2. On the hosting iPhone, open **Multiplayer > LAN host address**. Choose this phone’s Wi-Fi address
    (such as `192.168.1.20`) or Tailscale address, then tap **Use and copy address**. You can also enter
-   this phone’s Tailscale IP manually if it is not listed. This selects an interface; it does not start a server.
-3. Close that panel and choose **Host** and a game mode. The game’s built-in ENet server starts on the
+   this phone’s Tailscale IP manually if it is not listed. The panel closes automatically after copying;
+   its large **Close** button dismisses it without changing the address. Selection does not start a server.
+3. Choose **Host** and a game mode. The game’s built-in ENet server starts on the
    selected interface at UDP port `33771`. Share the copied address with your friends.
 4. On each joining iPhone, open **Multiplayer > Join**, paste the address and tap **Join LAN**.
    IPv4 can be entered as `192.168.1.20` or `192.168.1.20:33771`; Tailscale IPv6 uses `[address]:33771`.

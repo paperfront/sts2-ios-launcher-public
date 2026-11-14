@@ -36,22 +36,54 @@ internal sealed partial class LanHostScreen : Node
         screen.AddChild(settings);
     }
 
-    private static void ShowSettings(Control screen)
+    private static void ShowSettings(Control screen, Action<string>? copyAddress = null)
     {
-        var dialog = new AcceptDialog { Title = "Host from this iPhone", MinSize = new Vector2I(650, 300), Exclusive = true };
+        if (screen.HasNode("PhoneLanHostPanel")) return;
+        // Use the main game's viewport: embedded Window title bars and minimum-size negotiation
+        // do not behave like touch controls, and the old AcceptDialog could not be dismissed.
+        var dialog = new ColorRect { Name = "PhoneLanHostPanel", Color = new Color(0, 0, 0, 0.75f),
+            MouseFilter = Control.MouseFilterEnum.Stop, ZIndex = 1000 };
         screen.AddChild(dialog);
-        dialog.Confirmed += () => dialog.QueueFree();
-        dialog.Canceled += () => dialog.QueueFree();
-        var content = new VBoxContainer();
+        dialog.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        var frame = new MarginContainer { AnchorLeft = 0.15f, AnchorRight = 0.85f, AnchorTop = 0.06f, AnchorBottom = 0.94f };
+        dialog.AddChild(frame);
+        var panel = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Stop };
+        frame.AddChild(panel);
+        var padding = new MarginContainer();
+        foreach (string side in new[] { "left", "right", "top", "bottom" }) padding.AddThemeConstantOverride("margin_" + side, 24);
+        panel.AddChild(padding);
+        var column = new VBoxContainer();
+        column.AddThemeConstantOverride("separation", 16);
+        padding.AddChild(column);
+        void Close()
+        {
+            if (DisplayServer.HasFeature(DisplayServer.Feature.VirtualKeyboard)) DisplayServer.VirtualKeyboardHide();
+            dialog.Hide();
+            dialog.QueueFree();
+        }
+        var header = new HBoxContainer();
+        var title = new Label { Text = "Host from this iPhone", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        title.AddThemeFontSizeOverride("font_size", 34);
+        header.AddChild(title);
+        var close = new Button { Name = "Close", Text = "Close", CustomMinimumSize = new Vector2(180, 80) };
+        close.AddThemeFontSizeOverride("font_size", 30);
+        close.Pressed += Close;
+        header.AddChild(close);
+        column.AddChild(header);
+        var scroll = new ScrollContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        column.AddChild(scroll);
+        var content = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         content.AddThemeConstantOverride("separation", 16);
+        scroll.AddChild(content);
         var instructions = new Label { Text = "Choose this iPhone’s Wi-Fi or Tailscale IP, then use Host or Load.\nLeave Mods off on every phone. Keep the host app open and in the foreground.",
-            AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(600, 0) };
+            AutowrapMode = TextServer.AutowrapMode.WordSmart };
         instructions.AddThemeFontSizeOverride("font_size", 24);
         content.AddChild(instructions);
         var choices = new OptionButton { CustomMinimumSize = new Vector2(0, 56) };
         choices.AddThemeFontSizeOverride("font_size", 26);
         content.AddChild(choices);
-        var address = new LineEdit { Text = LanNetworkPolicy.HostAddress ?? "", PlaceholderText = "This iPhone’s private IP address",
+        var address = new LineEdit { Name = "Address", Text = LanNetworkPolicy.HostAddress ?? "", PlaceholderText = "This iPhone’s private IP address",
             CustomMinimumSize = new Vector2(0, 56) };
         address.AddThemeFontSizeOverride("font_size", 26);
         content.AddChild(address);
@@ -76,9 +108,9 @@ internal sealed partial class LanHostScreen : Node
         refresh.AddThemeFontSizeOverride("font_size", 26);
         refresh.Pressed += Refresh;
         content.AddChild(refresh);
-        var use = new Button { Text = "Use and copy address", CustomMinimumSize = new Vector2(0, 56) };
+        var use = new Button { Name = "UseAddress", Text = "Use and copy address", CustomMinimumSize = new Vector2(0, 96) };
         use.AddThemeFontSizeOverride("font_size", 26);
-        use.Pressed += () =>
+        void UseAddress()
         {
             string ip = address.Text.Trim();
             if (!LanNetworkPolicy.IsAllowedAddress(ip))
@@ -87,12 +119,15 @@ internal sealed partial class LanHostScreen : Node
                 return;
             }
             LanNetworkPolicy.SelectHostAddress(ip);
-            DisplayServer.ClipboardSet(ip.Contains(':') ? $"[{ip}]:{LanNetworkPolicy.DefaultPort}" : $"{ip}:{LanNetworkPolicy.DefaultPort}");
-            status.Text = "Address copied. Close this panel, then choose Host or Load. Friends use Multiplayer > Join.";
-        };
-        content.AddChild(use);
-        dialog.AddChild(content);
+            string shareAddress = ip.Contains(':') ? $"[{ip}]:{LanNetworkPolicy.DefaultPort}" : $"{ip}:{LanNetworkPolicy.DefaultPort}";
+            if (copyAddress != null) copyAddress(shareAddress);
+            else DisplayServer.ClipboardSet(shareAddress);
+            if (screen.GetNodeOrNull<Button>("PhoneLanHost") is { } settings) settings.Text = "LAN host: " + ip;
+            Close();
+        }
+        use.Pressed += UseAddress;
+        address.TextSubmitted += _ => UseAddress();
+        column.AddChild(use);
         Refresh();
-        dialog.PopupCentered();
     }
 }

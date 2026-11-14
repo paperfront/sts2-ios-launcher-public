@@ -1,0 +1,13 @@
+config_version=5
+[application]
+config/name="LAN panel interaction tests"
+run/main_scene="res://Probe.tscn"
+[display]
+window/size/viewport_width=2337
+window/size/viewport_height=1080
+[dotnet]
+project/assembly_name="GodotUi.Tests"
+[input_devices]
+pointing/emulate_mouse_from_touch=true
+[rendering]
+renderer/rendering_method="gl_compatibility"
